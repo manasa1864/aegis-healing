@@ -1,0 +1,17 @@
+{
+  "name": "aegis-heal-test",
+  "version": "1.0.0",
+  "description": "Maximally broken CI for AEGIS healing test",
+  "scripts": {
+    "test": "node tests/unit.js",
+    "lint": "eslint src/ --ext .js",
+    "build": "echo 'Build complete'",
+    "start": "node src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0"
+  }
+}

@@ -1,0 +1,200 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1 — setup
+  # BUG 1: Wrong Node version syntax (number not string)
+  # BUG 2: npm cache key references wrong lockfile
+  # ─────────────────────────────────────────────────────────────
+  setup:
+    name: Setup & Install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.99.99        # BUG 1: This version doesn't exist
+          cache: npm
+          cache-dependency-path: yarn.lock  # BUG 2: No yarn.lock — project uses npm
+
+      - name: Install dependencies
+        run: npm install --frozen-lockfile  # BUG 3: No package-lock.json committed — will fail
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2 — lint
+  # BUG 4: Circular dependency (needs test which needs lint)
+  # BUG 5: Wrong eslint flag
+  # BUG 6: Runs before install, so eslint binary won't exist
+  # ─────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    needs: [test]            # BUG 4: test needs lint → circular deadlock
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # BUG 6: No npm install here — eslint doesn't exist
+      - name: Run ESLint
+        run: npx eslint src/ --ext .js --config .eslintrc.json  # BUG 5: .eslintrc.json doesn't exist
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3 — test
+  # BUG 7: needs both setup and lint (lint needs test = circular)
+  # BUG 8: wrong test command
+  # BUG 9: wrong working directory
+  # BUG 10: undefined env secret
+  # ─────────────────────────────────────────────────────────────
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [setup, lint]     # BUG 7: lint needs test → circular
+
+    strategy:
+      matrix:
+        node: [16, 18, 20]   # BUG 8: Node 16 is EOL and unsupported
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install deps
+        run: npm ci           # BUG 9: No package-lock.json in repo — npm ci will fail
+
+      - name: Run unit tests
+        working-directory: ./test   # BUG 10: Directory is "tests" not "test"
+        run: node unit.js
+        env:
+          NODE_ENV: ${{ secrets.UNDEFINED_TEST_ENV }}  # BUG 11: Secret not defined
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 4 — coverage
+  # BUG 12: Depends on broken test job
+  # BUG 13: runs nyc which isn't installed
+  # BUG 14: uploads artifact from path that won't exist
+  # ─────────────────────────────────────────────────────────────
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm ci   # BUG 12: Still no package-lock.json
+
+      - name: Generate coverage
+        # BUG 13: nyc is not in package.json — not installed
+        run: npx nyc --reporter=lcov node tests/unit.js
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          # BUG 14: Coverage file won't exist because nyc failed
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}  # BUG 15: Secret not defined
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 5 — build
+  # BUG 16: Wrong OS (windows runner for a Linux-style script)
+  # BUG 17: Uses bash syntax on windows
+  # BUG 18: Wrong artifact path
+  # ─────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: windows-latest    # BUG 16: App uses Linux shell syntax
+    needs: [test]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install and build
+        # BUG 17: && chaining and echo syntax fails on Windows cmd
+        run: npm ci && mkdir -p dist && cp src/*.js dist/ && echo "Built OK"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          # BUG 18: dist/ won't exist because build step failed
+          path: dist/
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 6 — docker
+  # BUG 19: Missing DOCKER_USERNAME secret
+  # BUG 20: Wrong Dockerfile path
+  # BUG 21: Bad image tag with invalid characters
+  # ─────────────────────────────────────────────────────────────
+  docker:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}   # BUG 19: Secret not set
+          password: ${{ secrets.DOCKER_PASSWORD }}   # BUG 19: Secret not set
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile    # BUG 20: No Dockerfile anywhere in repo
+          push: true
+          tags: |
+            myapp:latest@@invalid      # BUG 21: @@ is invalid in Docker tag
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 7 — deploy
+  # BUG 22: Depends on docker which will fail
+  # BUG 23: SSH key secret not defined
+  # BUG 24: Wrong ssh-action version syntax
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [docker]
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v2.99.99   # BUG 24: This version doesn't exist
+        with:
+          host: ${{ secrets.PROD_HOST }}     # BUG 23: Not defined
+          username: ${{ secrets.PROD_USER }} # BUG 23: Not defined
+          key: ${{ secrets.PROD_SSH_KEY }}   # BUG 23: Not defined
+          script: |
+            cd /app && docker pull myapp:latest && docker-compose up -d

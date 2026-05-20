@@ -1,0 +1,70 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+
+  # ─────────────────────────────────────────────────────────────
+  # BUG 25: Wrong action version (non-existent)
+  # BUG 26: Missing required input
+  # BUG 27: Wrong output directory
+  # ─────────────────────────────────────────────────────────────
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm ci   # BUG 25: Still no lockfile
+
+      - name: Audit dependencies
+        # BUG 26: npm audit exits non-zero on any vulnerability — will always fail
+        # on a project with express 4.18.2 which has known advisories
+        run: npm audit --audit-level=low
+
+      - name: Save audit report
+        run: npm audit --json > ./reports/audit.json   # BUG 27: reports/ doesn't exist
+
+      - name: Upload audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: ./reports/audit.json   # BUG 27: File doesn't exist
+
+  snyk-scan:
+    name: Snyk Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Snyk
+        uses: snyk/actions/node@v99.99.99   # BUG 28: Version doesn't exist
+        with:
+          args: --severity-threshold=low
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}  # BUG 29: Secret not defined
+
+  secret-detection:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed for full history scan
+
+      - name: Detect secrets
+        # BUG 30: gitleaks action doesn't exist at this path/version
+        uses: gitleaks/gitleaks-action@v99
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # BUG 31: Not needed/not defined
