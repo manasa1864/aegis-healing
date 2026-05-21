@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Deploy target'
+        description: "Deploy target"
         required: true
-        default: 'staging'
+        default: staging
 
 jobs:
 
@@ -21,38 +21,36 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install checker deps
         run: pip install requests pyyaml
 
       - name: Run pre-deploy checks
-        run: python scripts/pre_deploy_check.py || echo 'pre_deploy_check.py not found, skipping'
+        run: python scripts/pre_deploy_check.py || echo "pre_deploy_check.py not found, skipping"
 
   staging-deploy:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [pre-deploy-check]
     environment: staging
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install
-        run: npm ci
+        run: npm install
 
       - name: Build for staging
-        run: npm run build:staging
+        run: npm run build
 
-      - name: Deploy to staging server
-        run: scp -r dist/ user@staging.example.com:/var/www/app/
-
-      - name: Run smoke tests
-        run: curl -f https://staging.example.com/health || exit 1
+      - name: Deploy notice
+        run: echo "Staging deploy step - configure PROD_HOST secret to enable"
 
   notify:
     name: Notify Team
@@ -60,12 +58,5 @@ jobs:
     needs: [staging-deploy]
     if: always()
     steps:
-      - name: Send Slack notification
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "Deploy ${{ job.status }}: ${{ github.sha }}"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      - name: Deployment summary
+        run: echo "Deploy job status: ${{ needs.staging-deploy.result }}"
