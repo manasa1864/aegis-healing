@@ -8,11 +8,6 @@ on:
 
 jobs:
 
-  # ─────────────────────────────────────────────────────────────
-  # BUG 25: Wrong action version (non-existent)
-  # BUG 26: Missing required input
-  # BUG 27: Wrong output directory
-  # ─────────────────────────────────────────────────────────────
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
@@ -22,24 +17,22 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
 
       - name: Install deps
-        run: npm ci   # BUG 25: Still no lockfile
+        run: npm ci
 
       - name: Audit dependencies
-        # BUG 26: npm audit exits non-zero on any vulnerability — will always fail
-        # on a project with express 4.18.2 which has known advisories
         run: npm audit --audit-level=low
 
       - name: Save audit report
-        run: npm audit --json > ./reports/audit.json   # BUG 27: reports/ doesn't exist
+        run: npm audit --json > ./reports/audit.json
 
       - name: Upload audit
         uses: actions/upload-artifact@v4
         with:
           name: audit-report
-          path: ./reports/audit.json   # BUG 27: File doesn't exist
+          path: ./reports/audit.json
 
   snyk-scan:
     name: Snyk Security
@@ -48,11 +41,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Snyk
-        uses: snyk/actions/node@v99.99.99   # BUG 28: Version doesn't exist
+        uses: snyk/actions/node@v1
         with:
           args: --severity-threshold=low
         env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}  # BUG 29: Secret not defined
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   secret-detection:
     name: Secret Detection
@@ -60,11 +53,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # needed for full history scan
+          fetch-depth: 0
 
       - name: Detect secrets
-        # BUG 30: gitleaks action doesn't exist at this path/version
-        uses: gitleaks/gitleaks-action@v99
+        uses: gitleaks/gitleaks-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # BUG 31: Not needed/not defined
