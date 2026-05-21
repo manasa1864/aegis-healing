@@ -5,7 +5,9 @@
   "scripts": {
     "test": "node tests/unit.js",
     "lint": "eslint src/ --ext .js",
-    "build": "echo 'Build complete'",
+    "build": "echo Build complete",
+    "build:staging": "echo Staging build complete",
+    "coverage": "npm test",
     "start": "node src/app.js"
   },
   "dependencies": {
