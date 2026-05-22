@@ -22,7 +22,7 @@ jobs:
 
   pre-deploy-check:
     name: Pre-Deploy Validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latestt
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,7 +50,7 @@ jobs:
   staging-deploy:
     continue-on-error: true
     name: Deploy to Staging
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latestt
     needs: [pre-deploy-check]
     if: github.ref == 'refs/heads/main'
     steps:
@@ -80,7 +80,7 @@ jobs:
   production-deploy:
     continue-on-error: true
     name: Deploy to Production
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latestt
     needs: [staging-deploy]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -98,7 +98,7 @@ jobs:
 
   notify:
     name: Notify Team
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latestt
     needs: [production-deploy]
     if: always()
     steps:
