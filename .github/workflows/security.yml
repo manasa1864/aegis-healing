@@ -3,11 +3,11 @@ name: Security Scan
 on:
  push:
  branches: [main]
-   paths-ignore:
-    - '**.md'
-    - 'docs/**'
-    - '.github/CODEOWNERS'
-    - 'LICENSE'
+  paths-ignore:
+  - '**.md'
+  - 'docs/**'
+  - '.github/CODEOWNERS'
+  - 'LICENSE'
  schedule:
  - cron: "0 0 * * 1"
 
@@ -20,61 +20,61 @@ jobs:
  name: Dependency Audit
  runs-on: ubuntu-latest
  steps:
-  - uses: actions/checkout@v4
-  with:
-   submodules: recursive
+ - uses: actions/checkout@v4
+ with:
+  submodules: recursive
 
-  - name: Setup Node
-   - uses: actions/setup-node@v4
-  with:
-   node-version: "20"
+ - name: Setup Node
+  - uses: actions/setup-node@v4
+ with:
+  node-version: "20"
 
-  - name: Install deps
-   - run: npm install
+ - name: Install deps
+  - run: npm install
 
-  - name: Audit dependencies
-   - run: npm audit --audit-level=critical || echo "Audit issues found (non-blocking)"
+ - name: Audit dependencies
+  - run: npm audit --audit-level=critical || echo "Audit issues found (non-blocking)"
 
-  - name: Save audit report
-   - run: |
-   mkdir -p ./reports
-   npm audit --json > ./reports/audit.json || true
+ - name: Save audit report
+  - run: |
+  mkdir -p ./reports
+  npm audit --json > ./reports/audit.json || true
 
-  - name: Upload audit
-   - uses: actions/upload-artifact@v4
-     retention-days: 7
-  with:
-   name: audit-report
-   path: ./reports/audit.json
-   if-no-files-found: warn
+ - name: Upload audit
+  - uses: actions/upload-artifact@v4
+   retention-days: 7
+ with:
+  name: audit-report
+  path: ./reports/audit.json
+  if-no-files-found: warn
 
  snyk-scan:
  name: Snyk Security
  runs-on: ubuntu-latest
  steps:
-  - uses: actions/checkout@v4
-  with:
-   submodules: recursive
+ - uses: actions/checkout@v4
+ with:
+  submodules: recursive
 
-  - name: Run Snyk
-   - uses: snyk/actions/node@v1
-  with:
-   args: --severity-threshold=high
-  env:
-   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-  continue-on-error: true
+ - name: Run Snyk
+  - uses: snyk/actions/node@v1
+ with:
+  args: --severity-threshold=high
+ env:
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+ continue-on-error: true
 
  secret-detection:
  name: Secret Detection
  runs-on: ubuntu-latest
  steps:
-  - uses: actions/checkout@v4
-  with:
-   submodules: recursive
-   fetch-depth: 0
+ - uses: actions/checkout@v4
+ with:
+  submodules: recursive
+  fetch-depth: 0
 
-  - name: Detect secrets
-   - uses: gitleaks/gitleaks-action@v1
-  env:
-   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  continue-on-error: true
+ - name: Detect secrets
+  - uses: gitleaks/gitleaks-action@v1
+ env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ continue-on-error: true
