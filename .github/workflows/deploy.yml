@@ -1,110 +1,140 @@
 name: Deploy Pipeline
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+ group: ${{ github.workflow }}-${{ github.ref }}
+ cancel-in-progress: false
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deploy target (staging or production)'
-        required: false
-        default: staging
+ push:
+  branches: [main]
+      paths-ignore:
+        - '**.md'
+        - 'docs/**'
+        - '.github/CODEOWNERS'
+        - 'LICENSE'
+ workflow_dispatch:
+  inputs:
+   environment:
+    description: 'Deploy target (staging or production)'
+    required: false
+    default: staging
 
 env:
-  NODE_ENV: test
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CI: 'true'
+  PYTHONUNBUFFERED: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONPATH: ${{ github.workspace }}
+ NODE_ENV: test
+ FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
 
-  pre-deploy-check:
-    name: Pre-Deploy Validation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+ pre-deploy-check:
+  name: Pre-Deploy Validation
+  runs-on: ubuntu-latest-latest
+  steps:
+   - name: Verify release tag
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+     run: |
 
-      - name: Install checker deps
-        run: pip install --no-cache-dir requests pyyaml
+       echo "Deploying tag: ${GITHUB_REF_NAME}"
 
-      - name: Run pre-deploy checks
+       echo "${GITHUB_REF_NAME}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' || (echo "ERROR: Production deploy requires a SemVer tag (e.g. v1.2.3). Got: ${GITHUB_REF_NAME}" && exit 1)
+
+   - uses: actions/checkout@v4
+    with:
+          fetch-depth: 0
+     submodules: recursive
+
+   - name: Setup Python
+      - uses: actions/setup-python@v5
+    with:
+     python-version: '3.12'
+          cache: 'pip'
+
+   - name: Install checker deps
+      - run: pip install --no-cache-dir requests pyyaml
+
+   - name: Run pre-deploy checks
+      - run: |
+     if [ -f scripts/pre_deploy_check.py ]; then
+      python scripts/pre_deploy_check.py
+     else
+      echo "pre_deploy_check.py not found - skipping"
+     fi
+
+   - name: Validate package.json
+      - run: node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package.json OK')"
+
+ staging-deploy:
+  continue-on-error: true
+  name: Deploy to Staging
+  runs-on: ubuntu-latest-latest
+  needs: [pre-deploy-check]
+  if: if: ${{ github.ref == 'refs/heads/main' }}
+  steps:
+   - uses: actions/checkout@v4
+    with:
+     submodules: recursive
+
+   - name: Setup Node
+      - uses: actions/setup-node@v4
+    with:
+     node-version: '20'
+
+   - name: Install
+      - run: npm install
+
+   - name: Build for staging
+      - run: npm run build
+
+   - name: Deploy to staging
+      - run: |
+     if [ -n "${{ secrets.STAGING_HOST }}" ] && [ -n "${{ secrets.STAGING_SSH_KEY }}" ]; then
+      echo "Deploying to ${{ secrets.STAGING_HOST }}"
+     else
+      echo "Staging secrets not configured - add STAGING_HOST + STAGING_SSH_KEY to enable"
+     fi
+
+ production-deploy:
+  continue-on-error: true
+  name: Deploy to Production
+  runs-on: ubuntu-latest-latest
+  needs: [staging-deploy]
+  if: if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+  steps:
+   - uses: actions/checkout@v4
+    with:
+     submodules: recursive
+
+      - name: Pre-deploy smoke test
         run: |
-          if [ -f scripts/pre_deploy_check.py ]; then
-            python scripts/pre_deploy_check.py
-          else
-            echo "pre_deploy_check.py not found - skipping"
-          fi
+          STAGING_URL="${STAGING_URL:-http://staging.example.com}"
+          echo "Running smoke tests against $STAGING_URL..."
+          # Health check
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/health" --max-time 10 || echo "000")
+          [ "$STATUS" != "200" ] && echo "FAIL: /health returned $STATUS" && exit 1
+          # Auth endpoint sanity
+          AUTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/v1/ping" --max-time 10 || echo "000")
+          [ "$AUTH_STATUS" = "000" ] && echo "FAIL: API unreachable" && exit 1
+          echo "Smoke tests passed (health=$STATUS, api=$AUTH_STATUS) — proceeding with deploy"
+   - name: Deploy to production
+      - run: |
+     if [ -n "${{ secrets.PROD_HOST }}" ] && [ -n "${{ secrets.PROD_SSH_KEY }}" ]; then
+      echo "Deploying to ${{ secrets.PROD_HOST }}"
+     else
+      echo "Production secrets not configured - add PROD_HOST + PROD_SSH_KEY to enable"
+     fi
 
-      - name: Validate package.json
-        run: node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package.json OK')"
-
-  staging-deploy:
-    continue-on-error: true
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: [pre-deploy-check]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install
-        run: npm install
-
-      - name: Build for staging
-        run: npm run build
-
-      - name: Deploy to staging
-        run: |
-          if [ -n "${{ secrets.STAGING_HOST }}" ] && [ -n "${{ secrets.STAGING_SSH_KEY }}" ]; then
-            echo "Deploying to ${{ secrets.STAGING_HOST }}"
-          else
-            echo "Staging secrets not configured - add STAGING_HOST + STAGING_SSH_KEY to enable"
-          fi
-
-  production-deploy:
-    continue-on-error: true
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [staging-deploy]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Deploy to production
-        run: |
-          if [ -n "${{ secrets.PROD_HOST }}" ] && [ -n "${{ secrets.PROD_SSH_KEY }}" ]; then
-            echo "Deploying to ${{ secrets.PROD_HOST }}"
-          else
-            echo "Production secrets not configured - add PROD_HOST + PROD_SSH_KEY to enable"
-          fi
-
-  notify:
-    name: Notify Team
-    runs-on: ubuntu-latest
-    needs: [production-deploy]
-    if: always()
-    steps:
-      - name: Deployment summary
-        run: |
-          echo "=== Deploy Pipeline Summary ==="
-          echo "Staging:    ${{ needs.staging-deploy.result }}"
-          echo "Production: ${{ needs.production-deploy.result }}"
-          echo "Commit:     ${{ github.sha }}"
+ notify:
+  name: Notify Team
+  runs-on: ubuntu-latest-latest
+  needs: [production-deploy]
+  if: ${{ always() }}
+  steps:
+   - name: Deployment summary
+      - run: |
+     echo "=== Deploy Pipeline Summary ==="
+     echo "Staging:    ${{ needs.staging-deploy.result }}"
+     echo "Production: ${{ needs.production-deploy.result }}"
+     echo "Commit:     ${{ github.sha }}"
