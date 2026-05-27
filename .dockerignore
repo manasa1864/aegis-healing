@@ -10,3 +10,17 @@ coverage
 .env
 .env.*
 !.env.example
+# Secrets — must never reach the Docker build context
+*.pem
+*.key
+*.p12
+*.pfx
+.env.production
+.env.local
+secrets/
+credentials/
+*.secret
+id_rsa
+id_ed25519
+*.crt
+kubeconfig
