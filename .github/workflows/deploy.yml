@@ -31,7 +31,7 @@ jobs:
 
  pre-deploy-check:
   name: Pre-Deploy Validation
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   steps:
    - name: Verify release tag
 
@@ -40,6 +40,18 @@ jobs:
        echo "Deploying tag: ${GITHUB_REF_NAME}"
 
        echo "${GITHUB_REF_NAME}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' || (echo "ERROR: Production deploy requires a SemVer tag (e.g. v1.2.3). Got: ${GITHUB_REF_NAME}" && exit 1)
+
+   - name: Verify release tag
+
+
+     run: |
+
+
+       echo "Deploying tag: ${GITHUB_REF_NAME}"
+
+
+       echo "${GITHUB_REF_NAME}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' || (echo "ERROR: Production deploy requires a SemVer tag (e.g. v1.2.3). Got: ${GITHUB_REF_NAME}" && exit 1)
+
 
    - uses: actions/checkout@v4
     with:
@@ -69,7 +81,7 @@ jobs:
  staging-deploy:
   continue-on-error: true
   name: Deploy to Staging
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [pre-deploy-check]
   if: if: ${{ github.ref == 'refs/heads/main' }}
   steps:
@@ -99,7 +111,7 @@ jobs:
  production-deploy:
   continue-on-error: true
   name: Deploy to Production
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [staging-deploy]
   if: if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
   steps:
@@ -108,6 +120,15 @@ jobs:
      submodules: recursive
 
       - name: Pre-deploy smoke test
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          STATUS: ${{ secrets.STATUS }}
+          STATUS: ${{ secrets.STATUS }}
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          AUTH_STATUS: ${{ secrets.AUTH_STATUS }}
+          STATUS: ${{ secrets.STATUS }}
+          AUTH_STATUS: ${{ secrets.AUTH_STATUS }}
         run: |
           STAGING_URL="${STAGING_URL:-http://staging.example.com}"
           echo "Running smoke tests against $STAGING_URL..."
@@ -117,7 +138,7 @@ jobs:
           # Auth endpoint sanity
           AUTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/v1/ping" --max-time 10 || echo "000")
           [ "$AUTH_STATUS" = "000" ] && echo "FAIL: API unreachable" && exit 1
-          echo "Smoke tests passed (health=$STATUS, api=$AUTH_STATUS) — proceeding with deploy"
+          echo "Smoke tests passed (health=$STATUS, api=$AUTH_STATUS) â proceeding with deploy"
    - name: Deploy to production
       - run: |
      if [ -n "${{ secrets.PROD_HOST }}" ] && [ -n "${{ secrets.PROD_SSH_KEY }}" ]; then
@@ -128,7 +149,7 @@ jobs:
 
  notify:
   name: Notify Team
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [production-deploy]
   if: ${{ always() }}
   steps:

@@ -33,7 +33,7 @@ jobs:
 
  setup:
   name: Setup & Install
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   steps:
    - uses: actions/checkout@v4
     with:
@@ -48,7 +48,7 @@ jobs:
 
  lint:
   name: Lint
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [setup]
   steps:
    - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
 
  test:
   name: Unit Tests
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [setup, lint]
   steps:
    - uses: actions/checkout@v4
@@ -82,7 +82,7 @@ jobs:
 
  coverage:
   name: Code Coverage
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [test]
   steps:
    - uses: actions/checkout@v4
@@ -105,7 +105,7 @@ jobs:
 
  build:
   name: Build
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [test]
   steps:
    - uses: actions/checkout@v4
@@ -132,7 +132,7 @@ jobs:
  docker:
   continue-on-error: true
   name: Docker Build & Push
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [build]
   if: if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
   steps:
@@ -145,24 +145,24 @@ jobs:
       echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       echo "Docker login successful"
      else
-      echo "DOCKER_USERNAME not configured Ã¢ÂÂ skipping registry push (add secret to enable)"
+      echo "DOCKER_USERNAME not configured ÃÂ¢ÃÂÃÂ skipping registry push (add secret to enable)"
      fi
    - name: Build Docker image
       - run: |
-     docker build -t myapp:latest . && echo "Docker build succeeded" || echo "Docker build failed Ã¢ÂÂ check Dockerfile"
+     docker build -t myapp:latest . && echo "Docker build succeeded" || echo "Docker build failed ÃÂ¢ÃÂÃÂ check Dockerfile"
    - name: Push to Docker Hub
       - run: |
      if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
       docker tag myapp:latest ${{ secrets.DOCKER_USERNAME }}/myapp:latest
       docker push ${{ secrets.DOCKER_USERNAME }}/myapp:latest && echo "Push succeeded"
      else
-      echo "Skipping push Ã¢ÂÂ DOCKER_USERNAME secret not configured"
+      echo "Skipping push ÃÂ¢ÃÂÃÂ DOCKER_USERNAME secret not configured"
      fi
 
  deploy:
   continue-on-error: true
   name: Deploy to Production
-  runs-on: ubuntu-latest-latest
+  runs-on: ubuntu-latest-latest-latest
   needs: [docker]
   if: if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
   steps:
