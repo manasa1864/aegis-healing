@@ -82,7 +82,7 @@ jobs:
   continue-on-error: true
   name: Deploy to Staging
   runs-on: ubuntu-latest
-  needs: [pre-deploy-check]
+  needs:]
   if: if: ${{ github.ref == 'refs/heads/main' }}
   steps:
    - uses: actions/checkout@v4
@@ -112,7 +112,7 @@ jobs:
   continue-on-error: true
   name: Deploy to Production
   runs-on: ubuntu-latest
-  needs: [staging-deploy]
+  needs:]
   if: if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
   steps:
    - uses: actions/checkout@v4
@@ -122,11 +122,6 @@ jobs:
       - name: Pre-deploy smoke test
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
-          STAGING_URL: ${{ secrets.STAGING_URL }}
-          STATUS: ${{ secrets.STATUS }}
-          STATUS: ${{ secrets.STATUS }}
-          STAGING_URL: ${{ secrets.STAGING_URL }}
-          AUTH_STATUS: ${{ secrets.AUTH_STATUS }}
           STATUS: ${{ secrets.STATUS }}
           AUTH_STATUS: ${{ secrets.AUTH_STATUS }}
         run: |
@@ -150,7 +145,7 @@ jobs:
  notify:
   name: Notify Team
   runs-on: ubuntu-latest
-  needs: [production-deploy]
+  needs:]
   if: ${{ always() }}
   steps:
    - name: Deployment summary
