@@ -69,6 +69,26 @@ jobs:
 
 
 
+   - name: Verify release tag
+
+
+
+
+     run: |
+
+
+
+
+       echo "Deploying tag: ${GITHUB_REF_NAME}"
+
+
+
+
+       echo "${GITHUB_REF_NAME}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' || (echo "ERROR: Production deploy requires a SemVer tag (e.g. v1.2.3). Got: ${GITHUB_REF_NAME}" && exit 1)
+
+
+
+
    - uses: actions/checkout@v4
     with:
           fetch-depth: 0
